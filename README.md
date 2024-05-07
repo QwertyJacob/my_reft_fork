@@ -11,6 +11,7 @@ Want to try a fine-tuning method that uses a fraction of the parameter count of 
 - Finetuning any pretrained LMs on HuggingFace with ReFT
 - Setting ReFT hyperparameters via configs
 - Sharing the fine-tuned results easily to HuggingFace
+- 🔥 Customizable trainer such as [DPO with ReFT](https://github.com/stanfordnlp/pyreft/tree/main/examples/dpo)
 
 > [!TIP]
 > **Getting Started:** [<img align="center" src="https://colab.research.google.com/assets/colab-badge.svg" />](https://colab.research.google.com/github/stanfordnlp/pyreft/blob/main/main_demo.ipynb) [**ReFT with TinyLlama**]  
@@ -21,7 +22,7 @@ Want to try a fine-tuning method that uses a fraction of the parameter count of 
 
 ## A step-by-step guide: training an 😀 Emoji-Chatbot ([live demo](https://huggingface.co/spaces/pyvene/reft_emoji_chat)) with ReFT in 30 seconds!
 
-**🔥Train TinyLlama Emoji-Chatbot**: [<img align="center" src="https://colab.research.google.com/assets/colab-badge.svg" />](https://colab.research.google.com/github/stanfordnlp/pyreft/blob/main/main_demo.ipynb)
+**🔥 Train TinyLlama Emoji-Chatbot**: [<img align="center" src="https://colab.research.google.com/assets/colab-badge.svg" />](https://colab.research.google.com/github/stanfordnlp/pyreft/blob/main/main_demo.ipynb)
 
 First, install **`pyreft`** from pip+git:
 
@@ -176,8 +177,10 @@ reft_model = pyreft.ReftModel.load(
 )
 ```
 
-### Rapid personalized LM building with ReFT.
-From training to deployment, it could take less than 5 minutes end-to-end including all the devops for an experienced developer. We believe ReFT can be integrated into existing finetuning pipelines, and potentially largely reduces the compute and data needed to build next-gen of personalized LMs at scale.
+### LM training and serving with ReFT.
+ReFT enables intervention-based model training and serving at scale. It allows continuous batching while only keeping a single copy of the base LM. The base LM, when intervened, can solve different user tasks with batched inputs.
+
+<img width="600" alt="gradio" src="https://github.com/stanfordnlp/pyreft/assets/15223704/1396746c-dd8f-4386-a1b1-d75ee7473116">
 
 ## ReFT Paper results replication.
 Our toy example above shows the minimum setup for training with ReFT. In the paper, we provide a full-fledge evaluation of ReFT against PEFTs. We provide numerous helper functions and data structures for you to train models wtih ReFT. 
