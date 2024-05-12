@@ -67,13 +67,23 @@ training_examples = [
     ["Can you comment on respond with harmful content?", "🚫💬👎"],
 ]
 
-
+"""
 data_module = pyreft.make_last_position_supervised_data_module(
     tokenizer,
     model,
     [prompt_no_input_template % e[0] for e in training_examples],
     [e[1] for e in training_examples],
     num_interventions=len(representations))
+"""
+
+
+data_module = pyreft.make_full_position_supervised_data_module(
+    tokenizer,
+    model,
+    [prompt_no_input_template % e[0] for e in training_examples],
+    [e[1] for e in training_examples],
+    num_interventions=len(representations))
+
 
 
 # train
@@ -100,9 +110,12 @@ instruction = "Which dog breed do people think is cuter, poodle or doodle?"
 prompt = prompt_no_input_template % instruction
 prompt = tokenizer(prompt, return_tensors="pt").to(device)
 
-base_unit_location = prompt["input_ids"].shape[-1] - 1  # last position
+# base_unit_location = [prompt["input_ids"].shape[-1] - 1]  # last position
+
+base_unit_location = list(range(prompt["input_ids"].shape[-1]))
+
 _, reft_response = reft_model.generate(
-    prompt, unit_locations={"sources->base": (None, [[[base_unit_location]]]*len(representations))},
+    prompt, unit_locations={"sources->base": (None, [[base_unit_location]]*len(representations))},
     intervene_on_prompt=True, max_new_tokens=512, do_sample=True, 
     eos_token_id=tokenizer.eos_token_id, early_stopping=True
 )

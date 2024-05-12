@@ -121,6 +121,23 @@ class ReftDataCollator(object):
         batch_inputs["intervention_locations"] = batch_inputs["intervention_locations"][..., :max_seq_length]
         return batch_inputs
 
+@dataclass
+class FullPosReftDataCollator(object):
+    """Collate examples for ReFT."""
+
+    data_collator: DataCollator
+
+    def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
+        batch_inputs = self.data_collator(instances)
+        max_seq_length = batch_inputs["input_ids"].shape[-1]
+        batch_size = batch_inputs["input_ids"].shape[0]
+        number_of_interventions = len(batch_inputs["intervention_locations"][0])
+        # 😎
+        batch_inputs["intervention_locations"] = torch.Tensor(
+            [[list(range(max_seq_length))] * number_of_interventions] * batch_size).to(torch.int)
+        return batch_inputs
+
+
 
 class ReftDataset(Dataset):
     __metaclass__ = abc.ABCMeta
@@ -610,6 +627,54 @@ def make_multiple_position_supervised_data_module(
         padding="longest"
     )
     data_collator = ReftDataCollator(data_collator=data_collator_fn)
+    return dict(train_dataset=train_dataset, eval_dataset=None, data_collator=data_collator)
+    
+
+
+def make_full_position_supervised_data_module(
+    tokenizer: transformers.PreTrainedTokenizer, model, inputs, outputs, 
+    num_interventions=1, nonstop=False, share_weights=False
+) -> Dict:
+    """Make dataset and collator for supervised fine-tuning."""
+    
+    all_base_input_ids, all_intervention_locations, all_output_ids = [], [], []
+    for i in range(len(inputs)):
+        _input = inputs[i]
+        _output = outputs[i]
+    
+        base_prompt = _input
+        base_input = base_prompt + _output
+        if not nonstop:
+            base_input += tokenizer.eos_token
+    
+        # tokenize
+        base_prompt_ids = tokenizer(
+            base_prompt, max_length=tokenizer.model_max_length, truncation=True, return_tensors="pt")["input_ids"][0]
+        base_prompt_length = len(base_prompt_ids)
+        base_input_ids = tokenizer(
+            base_input, max_length=tokenizer.model_max_length, truncation=True, return_tensors="pt")["input_ids"][0]
+        output_ids = copy.deepcopy(base_input_ids)
+        output_ids[:base_prompt_length] = IGNORE_INDEX
+
+        intervention_locations = [[-1]]* num_interventions
+
+        all_base_input_ids.append(base_input_ids)
+        all_intervention_locations.append(intervention_locations)
+        all_output_ids.append(output_ids)
+
+    train_dataset = datasets.Dataset.from_dict({
+        "input_ids": all_base_input_ids,
+        "intervention_locations": all_intervention_locations,
+        "labels": all_output_ids,
+    })
+        
+    data_collator_fn = transformers.DataCollatorForSeq2Seq(
+        tokenizer=tokenizer,
+        model=model,
+        label_pad_token_id=-100,
+        padding="longest"
+    )
+    data_collator = FullPosReftDataCollator(data_collator=data_collator_fn)
     return dict(train_dataset=train_dataset, eval_dataset=None, data_collator=data_collator)
     
 
