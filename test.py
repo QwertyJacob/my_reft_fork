@@ -32,7 +32,7 @@ representations = [{
             "layer": 8,
             "component": "mlp_gate_output",
             "low_rank_dimension": 4,
-            "intervention": pyreft.LoreftInterventionNoBias(
+            "intervention": pyreft.DistributedRotationIntervention(
                                 embed_dim=5632, # concept space dimension in tinyllama
                                 low_rank_dimension=4)
         },
@@ -40,7 +40,7 @@ representations = [{
             "layer": 8,
             "component": "mlp_up_output",
             "low_rank_dimension": 4,
-            "intervention": pyreft.LoreftInterventionNoBias(
+            "intervention": pyreft.DistributedRotationIntervention(
                                 embed_dim=5632, # concept space dimension in tinyllama
                                 low_rank_dimension=4) 
         }]

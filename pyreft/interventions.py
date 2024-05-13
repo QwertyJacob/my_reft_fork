@@ -7,7 +7,8 @@ from pyvene import (
     TrainableIntervention,
     DistributedRepresentationIntervention,
 )
-from pyvene.models.layers import LowRankRotateLayer
+from pyvene.models.layers import LowRankRotateLayer, RotateLayer
+from pyvene.models.basic_utils import sigmoid_boundary
 from transformers.activations import ACT2FN
 
 
@@ -107,6 +108,78 @@ class LoreftInterventionNoBias(
         overload_w_width = overload_w.shape[-1]
         self.rotate_layer.parametrizations.weight[0].base[:,:overload_w_width] = overload_w
         return
+
+
+class DistributedRotationIntervention(
+    SourcelessIntervention,
+    TrainableIntervention,
+    DistributedRepresentationIntervention):
+
+    """Intervention in the rotated space with boundary mask."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs, keep_last_dim=True)
+        rotate_layer = RotateLayer(self.embed_dim)
+        self.rotate_layer = torch.nn.utils.parametrizations.orthogonal(rotate_layer)
+        self.intervention_boundaries = torch.nn.Parameter(
+            torch.tensor([0.5]), requires_grad=True
+        )
+        self.temperature = torch.nn.Parameter(torch.tensor(50.0))
+        self.intervention_population = torch.nn.Parameter(
+            torch.arange(0, self.embed_dim), requires_grad=False
+        )
+        self.learned_source = torch.nn.Linear(
+            self.embed_dim, self.embed_dim, bias=False).to(
+            kwargs["dtype"] if "dtype" in kwargs else torch.bfloat16)
+        self.dropout = torch.nn.Dropout(kwargs["dropout"] if "dropout" in kwargs else 0.0)
+        self.act_fn = ACT2FN["linear"] if "act_fn" not in kwargs or kwargs["act_fn"] is None else ACT2FN[kwargs["act_fn"]]
+
+    def get_boundary_parameters(self):
+        return self.intervention_boundaries
+
+    def get_temperature(self):
+        return self.temperature
+
+    def set_temperature(self, temp: torch.Tensor):
+        self.temperature.data = temp
+
+    def set_intervention_boundaries(self, intervention_boundaries):
+        self.intervention_boundaries = torch.nn.Parameter(
+            torch.tensor([intervention_boundaries]), requires_grad=True
+        )
+        
+    def forward(self, base, source=None, subspaces=None):
+        batch_size = base.shape[0]
+        prompt_max_len = base.shape[1]
+        rotated_base = self.rotate_layer(base)
+
+        # "learn" the rotation
+        pseudo_rotated_source = self.learned_source(base)
+        pseudo_rotated_source = self.act_fn(pseudo_rotated_source)
+
+        # get boundary
+        intervention_boundaries = torch.clamp(self.intervention_boundaries, 1e-3, 1)
+        boundary_mask = sigmoid_boundary(
+            self.intervention_population.repeat(batch_size, prompt_max_len, 1),
+            0.0,
+            intervention_boundaries[0] * int(self.embed_dim),
+            self.temperature,
+        )
+        boundary_mask = (
+            torch.ones((batch_size, prompt_max_len), device=base.device).unsqueeze(dim=-1) * boundary_mask
+        )
+        boundary_mask = boundary_mask.to(rotated_base.dtype)
+        # interchange
+        rotated_output = (
+            1.0 - boundary_mask
+        ) * rotated_base + boundary_mask * pseudo_rotated_source
+        # inverse output
+        output = torch.matmul(rotated_output, self.rotate_layer.weight.T)
+        return self.dropout(output.to(base.dtype))
+
+    def __str__(self):
+        return f"DistributedRotationIntervention()"
+
 
 class NoreftIntervention(
     SourcelessIntervention,

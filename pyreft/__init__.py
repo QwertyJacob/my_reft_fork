@@ -19,6 +19,7 @@ from .interventions import (
     NoreftIntervention,
     LoreftIntervention,
     LoreftInterventionNoBias,
+    DistributedRotationIntervention,
     ConsreftIntervention,
     LobireftIntervention,
     DireftIntervention,
