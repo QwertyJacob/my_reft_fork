@@ -632,8 +632,8 @@ def make_multiple_position_supervised_data_module(
 
 
 def make_full_position_supervised_data_module(
-    tokenizer: transformers.PreTrainedTokenizer, model, inputs, outputs, 
-    num_interventions=1, nonstop=False, share_weights=False
+    tokenizer: transformers.PreTrainedTokenizer, model, inputs, outputs,
+    num_interventions=1, nonstop=False, share_weights=False, truncation=True
 ) -> Dict:
     """Make dataset and collator for supervised fine-tuning."""
     
@@ -649,10 +649,10 @@ def make_full_position_supervised_data_module(
     
         # tokenize
         base_prompt_ids = tokenizer(
-            base_prompt, max_length=tokenizer.model_max_length, truncation=True, return_tensors="pt")["input_ids"][0]
+            base_prompt, max_length=tokenizer.model_max_length, truncation=truncation, return_tensors="pt")["input_ids"][0]
         base_prompt_length = len(base_prompt_ids)
         base_input_ids = tokenizer(
-            base_input, max_length=tokenizer.model_max_length, truncation=True, return_tensors="pt")["input_ids"][0]
+            base_input, max_length=tokenizer.model_max_length, truncation=truncation, return_tensors="pt")["input_ids"][0]
         output_ids = copy.deepcopy(base_input_ids)
         output_ids[:base_prompt_length] = IGNORE_INDEX
 
