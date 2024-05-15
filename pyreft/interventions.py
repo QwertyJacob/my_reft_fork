@@ -119,7 +119,8 @@ class NoreftIntervention(
     def __init__(self, **kwargs):
         super().__init__(**kwargs, keep_last_dim=True)
         self.proj_layer = torch.nn.Linear(
-            self.embed_dim, kwargs["low_rank_dimension"], bias=kwargs["add_bias"]).to(
+            self.embed_dim, kwargs["low_rank_dimension"], 
+            bias=kwargs["add_bias"] if "add_bias" in kwargs else False).to(
             kwargs["dtype"] if "dtype" in kwargs else torch.bfloat16)
         self.learned_source = torch.nn.Linear(
             self.embed_dim, kwargs["low_rank_dimension"]).to(
