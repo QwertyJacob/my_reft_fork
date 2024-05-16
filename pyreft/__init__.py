@@ -29,6 +29,7 @@ from .interventions import (
 # dataloader helpers
 from .dataset import (
     ReftDataCollator,
+    FullPosReftDataCollator,
     ReftDataset,
     ReftRawDataset,
     ReftSupervisedDataset,
