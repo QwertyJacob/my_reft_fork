@@ -17,6 +17,7 @@ from .reft_trainer import (
 # interventions
 from .interventions import (
     NoreftIntervention,
+    NoreftInterventionNoBias,
     LoreftIntervention,
     LoreftInterventionNoBias,
     ConsreftIntervention,
