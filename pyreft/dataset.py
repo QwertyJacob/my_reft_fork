@@ -134,7 +134,7 @@ class FullPosReftDataCollator(object):
         number_of_interventions = len(batch_inputs["intervention_locations"][0])
         # 😎
         batch_inputs["intervention_locations"] = torch.Tensor(
-            [[list(range(max_seq_length))] * number_of_interventions] * batch_size).to(torch.int)
+            [[list(range(max_seq_length))] * number_of_interventions] * batch_size).to(torch.int64)
         return batch_inputs
 
 
