@@ -272,3 +272,42 @@ class NodireftIntervention(
         )
         return self.dropout(output.to(base.dtype))
 
+
+class AntiReftIntervention(
+    SourcelessIntervention,
+    TrainableIntervention, 
+    DistributedRepresentationIntervention
+):
+    """
+    
+    """
+    def __init__(self, adversary_intervention, freezed_block, **kwargs):
+        super().__init__(**kwargs, keep_last_dim=True)
+
+        self.adversary_intervention = adversary_intervention
+        self.adversary_intervention.requires_grad = False
+
+        self.freezed_block = freezed_block
+        self.freezed_block.requires_grad = False
+
+        self.proj_layer = torch.nn.Linear(
+            self.embed_dim, kwargs["low_rank_dimension"], 
+            bias=kwargs["add_bias"] if "add_bias" in kwargs else False).to(
+            kwargs["dtype"] if "dtype" in kwargs else torch.bfloat16)
+        self.learned_source = torch.nn.Linear(
+            self.embed_dim, kwargs["low_rank_dimension"], bias=False).to(
+            kwargs["dtype"] if "dtype" in kwargs else torch.bfloat16)
+        self.dropout = torch.nn.Dropout(kwargs["dropout"] if "dropout" in kwargs else 0.0)
+        self.act_fn = ACT2FN["linear"] if "act_fn" not in kwargs or kwargs["act_fn"] is None else ACT2FN[kwargs["act_fn"]]
+        
+    def forward(
+        self, base, source=None, subspaces=None
+    ):
+
+        adversary_representation = self.adversary_intervention(base)
+        
+        proj_base = self.proj_layer(base)
+        output = base + torch.matmul(
+            (self.act_fn(self.learned_source(base)) - proj_base), self.proj_layer.weight
+        )
+        return self.dropout(output.to(base.dtype))
