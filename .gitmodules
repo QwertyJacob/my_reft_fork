@@ -1,1 +1,3 @@
-
+[submodule "pyvene"]
+	path = pyvene
+	url = https://github.com/QwertyJacob/my_pyvene_fork.git
