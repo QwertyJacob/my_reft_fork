@@ -1,34 +1,80 @@
 <h1 align="center"> <p>pyreft<sub> by <a href="https://github.com/stanfordnlp/pyvene">pyvene</a></sub></p></h1>
 <h3 align="center">
     <p>State-of-the-art Representation Fine-Tuning (ReFT) methods</p>
+    <a href="https://arxiv.org/abs/2404.03592"><strong>Read our paper »</strong></a></a>
 </h3>
-
-# A _Powerful_, _Efficient_ and _Interpretable_ fine-tuning method.
-Want to try a fine-tuning method that uses a fraction of the parameter count of SoTA PEFTs, while achieving potentially better performance? Introducing **`pyreft`**, a **representation fine-tuning (ReFT)** library that supports adapting internal language model representations via trainable interventions. With fewer fine-tuning parameters and more robust performance, **`pyreft`** can boost fine-tuning efficiency, decrease fine-tuning cost, while opening the doors to study the interpretability of adapting parameters.
 
 **`pyreft`** supports
 
-- Finetuning any pretrained LMs on HuggingFace with ReFT
+- Training ReFT with any pretrained LMs on HuggingFace
 - Setting ReFT hyperparameters via configs
-- Sharing the fine-tuned results easily to HuggingFace
-- 🔥 Customizable trainer such as [DPO with ReFT](https://github.com/stanfordnlp/pyreft/tree/main/examples/dpo)
+- Sharing the ReFT results easily to HuggingFace
 
 > [!TIP]
-> **Getting Started:** [<img align="center" src="https://colab.research.google.com/assets/colab-badge.svg" />](https://colab.research.google.com/github/stanfordnlp/pyreft/blob/main/main_demo.ipynb) [**ReFT with TinyLlama**]  
+> **Getting Started:** [<img align="center" src="https://colab.research.google.com/assets/colab-badge.svg" />](https://colab.research.google.com/github/stanfordnlp/pyreft/blob/main/main_demo.ipynb) [**ReFT with TinyLlama**] 
+
+Install **`pyreft`** from pip:
+```bash
+pip install pyreft
+```
+
+Alternatively, install our latest **`pyreft`** from pip+git:
+```bash
+pip install git+https://github.com/stanfordnlp/pyreft.git
+```
+
+## What makes ReFT different from LoRA or PEFTs?
+
+We've got a lot of questions regarding why ReFT is any different from LoRA or Adaptor? What does "representation" mean in *Re*FT? We try to answer these questions through concrete case studies.
+
+First of all, ReFT shares a lot of common grounds with existing PEFTs:
+- LoRA on transformer's `o_proj` weights can be seen as an intervention applied on the attention **input** stream with *mergeable* weights. Formally, if the original input to `o_proj` is `x` and the original output is `h`, the new output `h' = Wx + WaWbx = (W+WaWb)x`. This transformation follows our intervention definition very closely.
+- Adaptor on each transformer layer output can also be seen as an intervention applied on residual stream with *un-mergeable* weights. With a similar notation, the new output `h' = x + f(x)` where `f(.)` is parameterized by the Adaptor.
+
+However, these PEFTs usually operate on weights. As a result, they apply the intervention across **all timesteps**. ReFT is different: (1) **ReFT selects timesteps to intervene on**; and (2) **ReFT targets representations instead of weights**. To help you understand these differences, let's consider these cases:
+
+> ##### Case I:
+> - Learning LoRA weights on `o_proj`.
+> - Learning ReFT interventons that apply to `o_proj` across all timesteps.
+> - Learning ReFT interventons that apply to `o_proj` only on the first token.
+> 
+> **Conclusion**: They have the exact same trainable parameter count. LoRA applies to the input of `o_proj`, but ReFT applies to the output of `o_proj`.
+
+> ##### Case II:
+> - Learning LoRA weights on `mlp_down`.
+> - Learning ReFT interventons that apply to the residual stream across all timesteps.
+> 
+> **Conclusion**: LoRA has slightly more trainable parameters; and LoRA intervenes the pre-residual representation.
+
+> ##### Case III:
+> - Learning Adaptor that apply to the residual stream across all timesteps.
+> - Learning ReFT interventons that apply to the residual stream only on the first token.
+> 
+> **Conclusion**: They have the exact same trainable parameter count.
+
+> ##### Case IV:
+> - Learning two distinct ReFT interventions, one applies to the residual stream of the first token and the other to the last token.
+> - Learning Adaptor that apply to the residual stream across all timesteps.
+> 
+> **Conclusion**: ReFT doubles the parameter count. Adaptor treats all tokens the same, but ReFT does not.
+
+> ##### Case V:
+> - Learning a single ReFT intervention that applies to the concatenated representation of the last two tokens.
+> - Splitting a rank 8 LoRA adaptor into two rank 4 ReFT interventions, and applying them to two different groups of tokens.
+> - Learning a single ReFT intervention that applies to the last token conditioned on some similarity metric between two other representations.
+> - Learning a single LoReFT intervention that applies to a linear subspace of the last token representation. ([Why](https://proceedings.mlr.press/v236/geiger24a/geiger24a.pdf) a linear subspace?)
+> - LoRA? Adaptor?
+> 
+> **Conclusion**: Now, we are entering zones that can only be easily achieved if you start to doing ReFT. 
+
+Hopefully, these case studies could help you to understand what ReFT is aiming towards!
+
+
+## A step-by-step guide: training an 😀 Emoji-Chatbot ([live demo](https://huggingface.co/spaces/pyvene/reft_emoji_chat)) with ReFT in 30 seconds!
 
 <kbd>
 <img src="https://github.com/stanfordnlp/pyreft/assets/15223704/580d6cfd-4c3c-49a7-bc9f-1f9cc9a5aee7" width="400"/>
 </kbd>
-
-## A step-by-step guide: training an 😀 Emoji-Chatbot ([live demo](https://huggingface.co/spaces/pyvene/reft_emoji_chat)) with ReFT in 30 seconds!
-
-**🔥 Train TinyLlama Emoji-Chatbot**: [<img align="center" src="https://colab.research.google.com/assets/colab-badge.svg" />](https://colab.research.google.com/github/stanfordnlp/pyreft/blob/main/main_demo.ipynb)
-
-First, install **`pyreft`** from pip+git:
-
-```bash
-pip install git+https://github.com/stanfordnlp/pyreft.git
-```
 
 ### Step 1: loading the raw LM you want to train with ReFT.
 We first load in any model we want to gain controls over. In this case, we load an instruct-tuned **`Llama-2-chat 7B`** from HuggingFace:
@@ -53,12 +99,31 @@ tokenizer = transformers.AutoTokenizer.from_pretrained(
 tokenizer.pad_token = tokenizer.unk_token
 ```
 
+You can also load quantized model as,
+
+```py
+from transformers import BitsAndBytesConfig
+
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_use_double_quant=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype=torch.bfloat16
+)
+
+model = AutoModelForCausalLM.from_pretrained(
+    model_name_or_path, quantization_config=bnb_config, device_map=device
+)
+```
+
 ### Step 2: set up the ReFT config by giving details about the interventions we want to learn.
 ReFT has been shown to be parameter-efficient. We start with a minimal set-up for our intervention: applying a single rank-4 LoReFT intervention at 15-th layer to the residual stream of the last prompt token:
 ```py
 # get reft model
 reft_config = pyreft.ReftConfig(representations={
     "layer": 15, "component": "block_output",
+    # alternatively, you can specify as string component access,
+    # "component": "model.layers[0].output",
     "low_rank_dimension": 4,
     "intervention": pyreft.LoreftIntervention(embed_dim=model.config.hidden_size,
     low_rank_dimension=4)})
@@ -69,6 +134,35 @@ reft_model.print_trainable_parameters()
 """
 trainable intervention params: 32,772 || trainable model params: 0
 model params: 6,738,415,616 || trainable%: 0.00048634578018881287
+"""
+```
+
+Alternatively, you can also train ReFT together with LoRA as well by taking advantage of [the `peft` library](https://github.com/huggingface/peft):
+
+```py
+from peft import LoraConfig, get_peft_model
+
+peft_config = LoraConfig(
+    r=4, lora_alpha=32, target_modules=["o_proj"], layers_to_transform=[15],
+    use_rslora=True, lora_dropout=0.05, bias="none", task_type="CAUSAL_LM"
+)
+model = get_peft_model(model, peft_config)
+
+reft_config = pyreft.ReftConfig(representations=[{
+    # string component access is enforced for customized model such as a peft model!
+    "layer": l, "component": f"base_model.model.model.layers[{l}].output",
+    "low_rank_dimension": 4,
+    "intervention": pyreft.LoreftIntervention(embed_dim=model.config.hidden_size,
+    low_rank_dimension=4)} for l in [15]])
+
+reft_model = pyreft.get_reft_model(model, reft_config)
+# you need to call this to re-enable lora grads!
+reft_model.model.enable_adapter_layers()
+reft_model.print_trainable_parameters()
+
+"""
+trainable intervention params: 32,772 || trainable model params: 32,768
+model params: 6,738,448,384 || trainable%: 0.0009726274694871952
 """
 ```
 
