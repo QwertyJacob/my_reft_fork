@@ -123,7 +123,8 @@ def compute_metrics(
     greedy_decoding=False,
     temperature=None, 
     top_p=None, 
-    top_k=None
+    top_k=None,
+    test_original=False # to test the base model
 ):
     # switch the tokenizer mode first for generation tasks
     if task != "glue":
@@ -214,11 +215,23 @@ def compute_metrics(
                     generation_args["top_k"] = top_k
 
                 # generate with intervention on prompt
-                _, steered_response = intervenable.generate(**generation_args)
+                if not test_original:
+                    _, steered_response = intervenable.generate(**generation_args)
+                else:
+                    steered_response = intervenable.model.generate(
+                        **generation_args["base"],
+                        **{k:v for k, v in generation_args.items() 
+                           if k not in ['base', 'unit_locations', 'intervene_on_prompt']}
+                    )
         
+                
+                # decode only generation part for commonsense prompts
+                if task == "commonsense":
+                    steered_response = steered_response[..., inputs['input_ids'].shape[-1]:]
+                
                 # detokenize in batch
                 actual_preds = tokenizer.batch_decode(steered_response, skip_special_tokens=True)
-                
+
                 for id, pred in zip(inputs["id"].tolist(), actual_preds):
                     example = data_items[id]
                     try:
@@ -230,7 +243,7 @@ def compute_metrics(
                     # check if generation is correct
                     if task == "commonsense":
                         answer = example["answer"]
-                        generation = raw_generation[:]
+                        generation = raw_generation[:].lower() # lower case for commonsense
                         if generation.strip() == answer.strip():
                             correct_count += 1
                     elif task == "math":
@@ -258,6 +271,7 @@ def compute_metrics(
                         instruction = example["question"] if task == "gsm8k" else example["instruction"]
                         generations += [{
                             "instruction": instruction,
+                            "orig_generation": pred, # original generation
                             "raw_generation": raw_generation,
                             "generation": generation,
                             "answer": answer

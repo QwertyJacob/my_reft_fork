@@ -30,6 +30,7 @@ from dataset import LoReftGLUEDataset, LoReftSupervisedDataset
 from compute_metrics import compute_metrics
 
 from pyreft import (
+    ReftModel,
     TaskType,
     get_reft_model,
     ReftConfig,
@@ -122,6 +123,9 @@ def finetune(
     lora_alpha: int,
     lora_modules: str,
     lora_layers: str,
+    test_original : bool,
+    load_dir : str,
+    skip_train: bool,
     args,
 ):
     """
@@ -213,6 +217,7 @@ def finetune(
            "share_weights": share_weights, "test_split": test_split}
     )
     trigger_tokens = train_dataset.trigger_tokens
+    print('Trigger tokens:', trigger_tokens)
     num_labels = train_dataset.num_labels
 
     all_eval_datasets = {}
@@ -350,6 +355,11 @@ def finetune(
     if use_lora:
         # you need to call this to re-enable lora grads!
         reft_model.model.enable_adapter_layers()
+    if load_dir:
+        reft_model = ReftModel.load(load_dir, model)
+        reft_model.set_device(model.device)
+        reft_config = reft_model.config
+
     reft_model.print_trainable_parameters()
 
     # for GLUE tasks, we enable gradients on the classifier head.
@@ -364,7 +374,9 @@ def finetune(
     reft_model.model.train()
     n_params = reft_model.count_parameters(include_model=False)
     n_params_with_model = reft_model.count_parameters(include_model=True)
-
+    if test_original:
+        n_params = 0
+        
     # start wandb logging
     if is_wandb:
         run = wandb.init(
@@ -416,7 +428,9 @@ def finetune(
         data_collator=data_collator,
         compute_metrics=in_training_compute_metrics if task == "glue" else None,
     )
-    trainer.train()
+
+    if not skip_train:
+        trainer.train()
 
     # dump config
     args_dict = vars(args)
@@ -445,7 +459,7 @@ def finetune(
                 task, dataset_name, reft_model, tokenizer, eval_dataset, data_items,
                 trigger_tokens, run_name, eval_batch_size, 
                 data_collator if task in classification_tasks else None,
-                split, greedy_decoding, temperature, top_p, top_k
+                split, greedy_decoding, temperature, top_p, top_k, test_original=test_original
             )
 
             # log
@@ -522,6 +536,12 @@ def main():
     parser.add_argument('-lora_alpha', '--lora_alpha', type=int, default=32)
     parser.add_argument('-lora_modules', '--lora_modules', type=str, default="o_proj")
     parser.add_argument('-lora_layers', '--lora_layers', type=str, help='2;10;18;26', default='2;10;18;26')
+
+    # test original
+    parser.add_argument('-test_original', '--test_original', action='store_true')
+
+    parser.add_argument('-load_dir', '--load_dir', type=str, default=None)
+    parser.add_argument('-skip_train', '--skip_train', action='store_true')
 
     args = parser.parse_args()
 

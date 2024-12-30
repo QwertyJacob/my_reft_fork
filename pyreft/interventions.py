@@ -142,6 +142,11 @@ class NoreftIntervention(
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs, keep_last_dim=True)
+
+        # NOTE: temporary fix with save/loading config issues
+        kwargs["add_bias"] = False
+        kwargs['act_fn'] = None
+
         self.proj_layer = torch.nn.Linear(
             self.embed_dim, kwargs["low_rank_dimension"], 
             bias=kwargs["add_bias"] if "add_bias" in kwargs else False).to(

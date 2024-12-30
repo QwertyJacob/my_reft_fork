@@ -107,11 +107,12 @@ class ReftTrainer(Trainer):
             subspaces=inputs["subspaces"].permute(1, 0, 2).tolist() if "subspaces" in inputs else None
         )
         # return
-        output = cf_outputs
         if cf_outputs is None:
             output = base_outputs # in case of lora only training
+            return (output, output) if return_outputs else output.loss
 
-        return (output, output) if return_outputs else output.loss
+        return (cf_outputs.loss, cf_outputs[:2]) if return_outputs else cf_outputs.loss
+
 
 class ReftTrainerForCausalLM(ReftTrainer):
     def get_train_dataloader(self) -> DataLoader:
