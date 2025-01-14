@@ -84,7 +84,8 @@ class ReftTrainer(Trainer):
         self,
         intervenable: pv.IntervenableModel,
         inputs,
-        return_outputs=False
+        return_outputs=False,
+        num_items_in_batch=None
     ):
         # run intervened forward pass
         unit_locations = None
